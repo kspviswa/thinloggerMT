@@ -27,8 +27,8 @@ could be examined from the core-file.
 Future works have been planned, to dump the instrumentation on-demand basis or shared memory.
 This buffer has been provided in a static lib format.
 
-Steps to use this API
-+++++++++++++++++++++
+Steps
+=====
 
 1) Define your own instrumentation info in THINLOGBUFFER struct.
 2) Avoid using custom types. Live with primitive types.
@@ -36,5 +36,5 @@ Steps to use this API
 4) Include thinLoggerMT.h in your source.
 5) call init() once and call doInstrumentation() with a pointer to THINLOGBUFFER struct N number of times you want.
 
---
+===============================================
 Viswa [kspviswa]

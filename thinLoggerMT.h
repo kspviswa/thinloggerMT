@@ -10,7 +10,7 @@
 
 #define MAX_CHAR 48
 #define MAX_BUFFERS_PER_THREAD 5
-#define MAX_THREADS_PER_PROCESS 1000
+#define MAX_THREADS_PER_PROCESS 7000
 
 struct thinLogBuffer
 {
@@ -18,6 +18,7 @@ struct thinLogBuffer
 	int nTestInt;
 	float nTestFloat;
 	char szTestChar[MAX_CHAR];
+	unsigned long nClockTicks;
 };
 
 typedef struct thinLogBuffer THINLOGBUFFER;

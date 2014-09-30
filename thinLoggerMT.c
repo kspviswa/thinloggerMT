@@ -46,13 +46,25 @@ int doInstrumentation(unsigned long nThreadId, THINLOGBUFFER *pSrc)
 
 	if(!pRingBuffer)
 	{
+		if(bUseLock)
+		{
+			pthread_mutex_unlock(&threadZeroMutex);
+		}
+		
 		return -1;
 	}
 
 	THINLOGBUFFER *pRingBufferNode = &pRingBuffer->theRingBuffers[pRingBuffer->nLookupId];
 
 	if(!pRingBufferNode)
+	{
+		if(bUseLock)
+		{
+			pthread_mutex_unlock(&threadZeroMutex);
+		}
+		
 		return -1;
+	}
 
 	memcpy(pRingBufferNode, pSrc, sizeof(THINLOGBUFFER));
 

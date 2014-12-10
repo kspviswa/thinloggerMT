@@ -24,6 +24,9 @@ Hence there is no need for the threads to wait for a lock, thereby increasing th
 These buffers are maintained in global state. As of now, if process core-dumps, then these buffers
 could be examined from the core-file.
 
+For more information on how to debug with the instrumentation enabled, visit my blog about this project
+http://kspviswa.wordpress.com/2014/10/03/lock-free-thread-based-log-buffer-implementation-for-debugging-high-performance-multi-threaded-app/ 
+
 Future works have been planned, to dump the instrumentation on-demand basis or shared memory.
 This buffer has been provided in a static lib format.
 
@@ -37,4 +40,4 @@ Steps
 5) call init() once and call doInstrumentation() with a pointer to THINLOGBUFFER struct N number of times you want.
 
 ===============================================
-Viswa [kspviswa]
+Viswa [kspviswa.wordpress.com]

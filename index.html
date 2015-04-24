@@ -78,6 +78,10 @@ The most traditional way to deal with such situations is to log relevant details
 <p>Every buffer is a type of <code>THINLOGTHREADCONTAINER</code>, which contains another array of the log buffer of type THINLOGBUFFER and the thread id index to the globalBuffer.
 There are chances that the same thread is being called by multiple callers [consider worker threads]. In such case, if every thread has only single buffer, then the next caller of same thread will over-write the information, that was recorded by the previous caller for same thread. We don’t want that to happen, do we Smile | :) . That’s the reason for tagging multiple log buffers to a single thread container.</p>
 
+<p>Following figure depicts this.</p>
+
+<p><img src="https://i2.wp.com/www.codeproject.com/KB/debug/824316/DesignFlow.jpg" alt=""></p>
+
 <h3>
 <a id="special-container--thread-0" class="anchor" href="#special-container--thread-0" aria-hidden="true"><span class="octicon octicon-link"></span></a>Special container – Thread 0</h3>
 

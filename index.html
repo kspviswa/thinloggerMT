@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
+
+    <title>ThinloggerMT by kspviswa</title>
+  </head>
+
+  <body>
+
+    <header>
+      <div class="container">
+        <h1>ThinloggerMT</h1>
+        <h2>Lock-free, Thread Based Log Buffer Implementation, for Debugging High Performance Multi-threaded Application</h2>
+
+        <section id="downloads">
+          <a href="https://github.com/kspviswa/thinloggerMT/zipball/master" class="btn">Download as .zip</a>
+          <a href="https://github.com/kspviswa/thinloggerMT/tarball/master" class="btn">Download as .tar.gz</a>
+          <a href="https://github.com/kspviswa/thinloggerMT" class="btn btn-github"><span class="icon"></span>View on GitHub</a>
+        </section>
+      </div>
+    </header>
+
+    <div class="container">
+      <section id="main_content">
+        <h1>
+<a id="introduction" class="anchor" href="#introduction" aria-hidden="true"><span class="octicon octicon-link"></span></a>Introduction</h1>
+
+<p>I would like to present a concept &amp; implementation about lock-free, thread based log buffer instrumentation in multi-threaded applications. Please post your feedback on comments, if any.</p>
+
+<h1>
+<a id="background" class="anchor" href="#background" aria-hidden="true"><span class="octicon octicon-link"></span></a>Background</h1>
+
+<p>When multiple threads work on a single process, certain scenarios will occur, which we term as race condition. During race condition, the output of execution turns unpredictable and most importantly, these race conditions are always inconsistent.</p>
+
+<p>Due to the inconsistent nature for race conditions, debugging becomes much tougher and challenging.
+The most traditional way to deal with such situations is to log relevant details to a log file, which can be examined after some time, or, do a live debugging.</p>
+
+<p><strong>Live debugging</strong> can be done, only if you guys are lucky Smile | :) . Mostly, bugs due to race conditions are hard to reproduce and difficult to find root-cause.</p>
+
+<p>In case of issues, raised from production site, engineers have less chances to keep their hands-on the problematic site.</p>
+
+<p>With the provided opportunities, somehow, the puzzle has to be solved.</p>
+
+<p>With the learnings, that I got from, support experience, I would like to share a novel way with which we can log the debugging information, that too for a high performance, race conditions.</p>
+
+<h1>
+<a id="problems-with-traditional-methods" class="anchor" href="#problems-with-traditional-methods" aria-hidden="true"><span class="octicon octicon-link"></span></a>Problems with Traditional Methods</h1>
+
+<h2>
+<a id="file-logging" class="anchor" href="#file-logging" aria-hidden="true"><span class="octicon octicon-link"></span></a>File logging</h2>
+
+<p>This is one of the easiest &amp; simplest methods. But file I/O will significantly add lot of delay. A delay even in the range of milli seconds, will impact the race condition, so that, the problematic scenario won’t even occur.</p>
+
+<h2>
+<a id="common-log-structure-logging" class="anchor" href="#common-log-structure-logging" aria-hidden="true"><span class="octicon octicon-link"></span></a>Common log structure logging</h2>
+
+<p>This is much dev approach, where-in, a global log buffer, is used to log relevant details to that buffer. However, this buffer again becomes a shared resource b/w threads. So obviously there has to be a mutex to guard the shared resource. When you bring in mutual exclusion, then you are breaking the parallelism. This again, brings in latency, introduced by locking &amp; unlocking of mutexes, thereby forcing the race-condition, not to occur at all.</p>
+
+<h1>
+<a id="concept--implementation" class="anchor" href="#concept--implementation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Concept &amp; Implementation</h1>
+
+<p>As you can guess, the problem with common log-structure logging is the presence of shared mutex lock.</p>
+
+<p>As long as one or more threads, is using the same resource, lock is necessary. So we have to break this common resource.</p>
+
+<p>If all the working threads are having their buffer to log, what they do currently and if there is a global place in the process which will connect all these unique buffers, then that will exactly serves the purpose.</p>
+
+<p>That’s the idea behind this article. This can be achieved in 2 ways. Dynamically allocate a buffer to the incoming thread [as threads can be spawned dynamically] or keep the thread id as index of global buffers. While the first option is most scalable option, the second option can be opted, if the latency introduced by attaching a buffer to the thread is also crucial for your scenario.</p>
+
+<p><code>gGLobalBuffers</code> is the array of log buffers, indexed by thread ids. Here you can ask about the wastage of buffers for unused threads. My argument would be, this is not going to be a feature or customer deliverable. We can do anything that it takes to solve a customer issue. So sacrificing some memory to find the root-cause is still a good attempt.</p>
+
+<p>Every buffer is a type of <code>THINLOGTHREADCONTAINER</code>, which contains another array of the log buffer of type THINLOGBUFFER and the thread id index to the globalBuffer.
+There are chances that the same thread is being called by multiple callers [consider worker threads]. In such case, if every thread has only single buffer, then the next caller of same thread will over-write the information, that was recorded by the previous caller for same thread. We don’t want that to happen, do we Smile | :) . That’s the reason for tagging multiple log buffers to a single thread container.</p>
+
+<h3>
+<a id="special-container--thread-0" class="anchor" href="#special-container--thread-0" aria-hidden="true"><span class="octicon octicon-link"></span></a>Special container – Thread 0</h3>
+
+<p>First container is special. Obviously, you will not have a thread 0. So this is used as a overflow container. For example, you had estimated that, for your application, you are going to have only 100 threads. So 100 containers might be enough for you. But during run time, another thread pokes-in [like customer had changed the config during run-time]. Thread 0 container, comes for rescue at that time. The presence of data on container 0 tells that you need to revisit your resource settings.</p>
+
+<h3>
+<a id="using-the-code" class="anchor" href="#using-the-code" aria-hidden="true"><span class="octicon octicon-link"></span></a>Using the Code</h3>
+
+<p><strong>STEP 1 – DEFINE YOUR OWN INSTRUMENTATION INFO IN THINLOGBUFFER STRUCT IN THINLOGGERMT.H.</strong></p>
+
+<p>`
+    struct thinLogBuffer
+    {
+        unsigned long nTestLong;
+        int nTestInt;
+        float nTestFloat;
+        char szTestChar[MAX_CHAR];
+        unsigned long nClockTicks;
+    };</p>
+
+<pre><code>typedef struct thinLogBuffer THINLOGBUFFER;
+</code></pre>
+
+<p>`</p>
+
+<p>Try to live with primitives. The instrumentation logic, simply uses <code>memcpy()</code>. So copying the pointer, will not copy the actual pointee. But again, you can override the <code>doInstrumentation()</code> to perform a deep copy.</p>
+
+<p><strong>STEP 2 – DEFINE YOUR TOTAL CONTAINER SIZE &amp; NUMBER OF BUFFERS PER CONTAINER</strong></p>
+
+<p><code>
+    #define MAX_BUFFERS_PER_THREAD 5
+    #define MAX_THREADS_PER_PROCESS 7000
+</code>
+The above snippet will make 7000 containers [which will cater for threads whose IDs fall between 0 – 7000] and each thread can save 5 callers information simultaneously.</p>
+
+<p><strong>Important Note</strong></p>
+
+<p><em>In case of Solaris, the threads start from thread 1 and go on. In case of Linux, there is no concept of threads / lwp. These are simple processes, but with shared address spaces. So in case of Linux, the thread ids will keep increasing depending on the number of processes running during that time. If you are using this solution in Linux, you should be increasing the number of containers, as the lwp id of each thread will be used as index to global buffers. You can also maintain a application specific logic of mapping a short integers to lwps and give that short integer as a index to globalBuffers. But again, this may introduce latency. If your application is not that much real-time, then you can go for it.</em></p>
+
+<p><strong>STEP 3 – USE THE APIS INIT() &amp; DOINSTRUMENTATION</strong></p>
+
+<p>Init the library using <code>init()</code></p>
+
+<p>`
+       int nRet = init();</p>
+
+<pre><code>    if(nRet &lt; 0)
+    {
+            // probably some problem
+            printf("\n Unable to init the library");
+            return;
+    }
+</code></pre>
+
+<p>`</p>
+
+<p>Create a local <code>THINLOGBUFFER</code>, fill the values and do the instrumentation.</p>
+
+<p>`
+        THINLOGBUFFER myBuffer;</p>
+
+<pre><code>    struct timeval tp;
+    gettimeofday(&amp;tp, NULL);
+    unsigned long ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+
+    myBuffer.nClockTicks = ms;
+    myBuffer.nTestFloat = (676.56 + rand());
+    myBuffer.nTestInt = rand();
+    myBuffer.nTestLong = rand() + myBuffer.nTestFloat;
+    strcpy(myBuffer.szTestChar, "Viswaaaaaa");
+
+    int nRet = doInstrumentation(nThreadID, &amp;myBuffer);
+
+    if(nRet &lt; 0)
+    {
+            printf("Instrumentation failed");
+    }
+</code></pre>
+
+<p>`</p>
+
+<p><em>Note: You can call this <code>doInstrumentation()</code> for upto <code>MAX_BUFFERS_PER_THREAD</code> times from the same thread. You can still call <code>N</code> number of times, just that, it will overwrite the buffers and when it overflows the <code>MAX_BUFFERS_PER_THREAD limit</code></em></p>
+
+<h2>
+<a id="reading-the-buffers-in-post-mortem-debugging" class="anchor" href="#reading-the-buffers-in-post-mortem-debugging" aria-hidden="true"><span class="octicon octicon-link"></span></a>Reading the Buffers in Post-mortem Debugging</h2>
+
+<p>As you can rightly guess, these buffers are in global location of process. If a problem / crash happens in site, and if the customer provides the core / crashdump from the site, with this instrumentation, then debugging will be as easy, like this:</p>
+
+<p>`
+    (gdb) print gGLobalBuffers[5313]
+    $6 = {
+         nLookupId = 0, 
+         theRingBuffers = {{
+         nTestLong = 2138875903, 
+         nTestInt = 1957747793, 
+         nTestFloat = 1.71463757e+09, 
+         szTestChar = Viswaaaaaa00\267\224\337w\267, 00
+         , \330]\267, 00 , y\267, 
+         nClockTicks = 3084490601
+        }, </p>
+
+<p>`</p>
+
+<h1>
+<a id="points-of-interest" class="anchor" href="#points-of-interest" aria-hidden="true"><span class="octicon octicon-link"></span></a>Points of Interest</h1>
+
+<p>ThinloggerMT is a simple ringle-buffer implementation, where the buffers are indexed with the thread-id. i.e Each thread has its own log buffer and these buffers are in-turn related to each other.</p>
+
+<p>Since each thread has its own buffer, these threads don’t depend on each other. Hence there is no need for the threads to wait for a lock, thereby increasing the log-time of the threads.</p>
+
+<p>These buffers are maintained in global state. As of now, if process core-dumps, then these buffers could be examined from the core-file. Future works have been planned, to dump the instrumentation on-demand basis or shared memory. This buffer has been provided in a static lib format.</p>
+      </section>
+    </div>
+
+    
+  </body>
+</html>

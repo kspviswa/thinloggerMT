@@ -88,30 +88,27 @@ There are chances that the same thread is being called by multiple callers [cons
 
 <p><strong>STEP 1 – DEFINE YOUR OWN INSTRUMENTATION INFO IN THINLOGBUFFER STRUCT IN THINLOGGERMT.H.</strong></p>
 
-<p>`
-    struct thinLogBuffer
+<pre><code>    struct thinLogBuffer
     {
         unsigned long nTestLong;
         int nTestInt;
         float nTestFloat;
         char szTestChar[MAX_CHAR];
         unsigned long nClockTicks;
-    };</p>
+    };
 
-<pre><code>typedef struct thinLogBuffer THINLOGBUFFER;
+    typedef struct thinLogBuffer THINLOGBUFFER;
 </code></pre>
-
-<p>`</p>
 
 <p>Try to live with primitives. The instrumentation logic, simply uses <code>memcpy()</code>. So copying the pointer, will not copy the actual pointee. But again, you can override the <code>doInstrumentation()</code> to perform a deep copy.</p>
 
 <p><strong>STEP 2 – DEFINE YOUR TOTAL CONTAINER SIZE &amp; NUMBER OF BUFFERS PER CONTAINER</strong></p>
 
-<p><code>
-    #define MAX_BUFFERS_PER_THREAD 5
+<pre><code>    #define MAX_BUFFERS_PER_THREAD 5
     #define MAX_THREADS_PER_PROCESS 7000
-</code>
-The above snippet will make 7000 containers [which will cater for threads whose IDs fall between 0 – 7000] and each thread can save 5 callers information simultaneously.</p>
+</code></pre>
+
+<p>The above snippet will make 7000 containers [which will cater for threads whose IDs fall between 0 – 7000] and each thread can save 5 callers information simultaneously.</p>
 
 <p><strong>Important Note</strong></p>
 
@@ -121,43 +118,37 @@ The above snippet will make 7000 containers [which will cater for threads whose 
 
 <p>Init the library using <code>init()</code></p>
 
-<p>`
-       int nRet = init();</p>
+<pre><code>       int nRet = init();
 
-<pre><code>    if(nRet &lt; 0)
-    {
-            // probably some problem
-            printf("\n Unable to init the library");
-            return;
-    }
+        if(nRet &lt; 0)
+        {
+                // probably some problem
+                printf("\n Unable to init the library");
+                return;
+        }
 </code></pre>
-
-<p>`</p>
 
 <p>Create a local <code>THINLOGBUFFER</code>, fill the values and do the instrumentation.</p>
 
-<p>`
-        THINLOGBUFFER myBuffer;</p>
+<pre><code>        THINLOGBUFFER myBuffer;
 
-<pre><code>    struct timeval tp;
-    gettimeofday(&amp;tp, NULL);
-    unsigned long ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+        struct timeval tp;
+        gettimeofday(&amp;tp, NULL);
+        unsigned long ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
 
-    myBuffer.nClockTicks = ms;
-    myBuffer.nTestFloat = (676.56 + rand());
-    myBuffer.nTestInt = rand();
-    myBuffer.nTestLong = rand() + myBuffer.nTestFloat;
-    strcpy(myBuffer.szTestChar, "Viswaaaaaa");
+        myBuffer.nClockTicks = ms;
+        myBuffer.nTestFloat = (676.56 + rand());
+        myBuffer.nTestInt = rand();
+        myBuffer.nTestLong = rand() + myBuffer.nTestFloat;
+        strcpy(myBuffer.szTestChar, "Viswaaaaaa");
 
-    int nRet = doInstrumentation(nThreadID, &amp;myBuffer);
+        int nRet = doInstrumentation(nThreadID, &amp;myBuffer);
 
-    if(nRet &lt; 0)
-    {
-            printf("Instrumentation failed");
-    }
+        if(nRet &lt; 0)
+        {
+                printf("Instrumentation failed");
+        }
 </code></pre>
-
-<p>`</p>
 
 <p><em>Note: You can call this <code>doInstrumentation()</code> for upto <code>MAX_BUFFERS_PER_THREAD</code> times from the same thread. You can still call <code>N</code> number of times, just that, it will overwrite the buffers and when it overflows the <code>MAX_BUFFERS_PER_THREAD limit</code></em></p>
 
@@ -166,8 +157,7 @@ The above snippet will make 7000 containers [which will cater for threads whose 
 
 <p>As you can rightly guess, these buffers are in global location of process. If a problem / crash happens in site, and if the customer provides the core / crashdump from the site, with this instrumentation, then debugging will be as easy, like this:</p>
 
-<p>`
-    (gdb) print gGLobalBuffers[5313]
+<pre><code>    (gdb) print gGLobalBuffers[5313]
     $6 = {
          nLookupId = 0, 
          theRingBuffers = {{
@@ -175,11 +165,11 @@ The above snippet will make 7000 containers [which will cater for threads whose 
          nTestInt = 1957747793, 
          nTestFloat = 1.71463757e+09, 
          szTestChar = Viswaaaaaa00\267\224\337w\267, 00
-         , \330]\267, 00 , y\267, 
+         &lt;repeats 12 times&gt;, \330]\267, 00 &lt;repeats 13 times&gt;, y\267, 
          nClockTicks = 3084490601
-        }, </p>
+        }, 
 
-<p>`</p>
+</code></pre>
 
 <h1>
 <a id="points-of-interest" class="anchor" href="#points-of-interest" aria-hidden="true"><span class="octicon octicon-link"></span></a>Points of Interest</h1>
